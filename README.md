@@ -7,3 +7,11 @@ The curve option takes comma separated points on the curve and gradient. The fir
 e.g.
 --curve 0 0, 10 110 1, 20 120 1
 Which describes a curve making the first 110 seconds of the input video fit into the first 10 seconds of the output video, gradually slowing down to normal speed, then the last 10 seconds is at normal speed
+
+**Requirements**
+
+* Python3
+* moviepy
+* numpy
+* librosa
+* cv2

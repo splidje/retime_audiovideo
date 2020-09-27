@@ -55,6 +55,7 @@ if __name__ == "__main__":
     func_args = parser.add_mutually_exclusive_group(required=True)
     func_args.add_argument('-c', '--curve', nargs="+", help="comma separated pairs or triples of floats. <out time> <in time> [<gradient>]. (secs)")
     func_args.add_argument('-e', '--expr', nargs="+", help="python expression given t as out time and evaluating to in time. (secs)")
+    parser.add_argument('-g', '--graph', action='store_true', help="Show a graph of the curve before processing.")
     parser.add_argument('out_path')
     args = parser.parse_args()
 
@@ -128,6 +129,13 @@ if __name__ == "__main__":
         out_s += jump
     print((max_in_s, max_out_s))
 
+    if args.graph:
+        from matplotlib import pyplot
+        x = range(0, max_out_s+1)
+        y = [map_func(xx / in_audio.fps) * in_audio.fps for xx in x]
+        pyplot.plot(x,y)
+        pyplot.show()
+
     print("Retiming audio...", file=sys.stderr)
 
     new_audio = numpy.zeros((max_out_s + 1, in_audio.nchannels))
@@ -151,23 +159,18 @@ if __name__ == "__main__":
         in_s_len = in_s_end - in_s
         out_s_len = out_s_end - out_s_rnd
         speed = in_s_len / out_s_len
-        try:
-            in_chunk = in_audio.subclip(
-                in_s / in_audio.fps,
-                min( (in_s_end-1) / in_audio.fps, in_audio.duration ),
-            ).to_soundarray()
-            if in_chunk.shape[0] < in_s_len:
-                new_in_chunk = numpy.zeros((in_s_len, in_audio.nchannels))
-                new_in_chunk[:in_chunk.shape[0], :] = in_chunk
-                in_chunk = new_in_chunk
-            out_chunk = speed_audio(in_chunk, speed)
-            if is_neg_speed:
-                out_chunk = out_chunk[::-1,:]
-            new_audio[out_s_rnd:out_s_end, :] = out_chunk
-        except Exception:
-            print((in_s, in_s_end, out_s, out_s_rnd, out_s_end, speed))
-            print((in_chunk.shape, out_chunk.shape))
-            raise
+        in_chunk = in_audio.subclip(
+            in_s / in_audio.fps,
+            min( (in_s_end-1) / in_audio.fps, in_audio.duration ),
+        ).to_soundarray()
+        if in_chunk.shape[0] < in_s_len:
+            new_in_chunk = numpy.zeros((in_s_len, in_audio.nchannels))
+            new_in_chunk[:in_chunk.shape[0], :] = in_chunk
+            in_chunk = new_in_chunk
+        out_chunk = speed_audio(in_chunk, speed)
+        if is_neg_speed:
+            out_chunk = out_chunk[::-1,:]
+        new_audio[out_s_rnd:out_s_end, :] = out_chunk
         print("{} / {} {}\t\r".format(out_s, max_out_s, speed), end="", file=sys.stderr)
         out_s = next_out_s
 
@@ -191,14 +194,11 @@ if __name__ == "__main__":
     def video_make_frame(out_t):
         global in_video_cv2_pos
         in_f = int(round(map_func(out_t) * in_video.fps))
-        if (out_t + 1) * in_audio.fps > max_out_s:
+        next_out_t = out_t + 1 / in_video.fps
+        if next_out_t * in_audio.fps > max_out_s:
             in_f_end = int(in_video.duration * in_video.fps) + 1
         else:
-            try:
-                in_f_end = int(round(map_func(out_t + 1 / in_video.fps) * in_video.fps))
-            except Exception:
-                print((out_t, in_f, out_t*in_audio.fps))
-                raise
+            in_f_end = int(round(map_func(next_out_t) * in_video.fps))
         if in_f > in_f_end:
             in_f, in_f_end = in_f_end, in_f
         num_f = in_f_end - in_f
@@ -212,6 +212,7 @@ if __name__ == "__main__":
                 im += im_f / num_f
         in_video_cv2_pos = in_f_end
         return numpy.clip(im, 0, 255).astype(numpy.uint8)
+    
 
     out_video = moviepy.editor.VideoClip(make_frame=video_make_frame, duration=out_audio.duration)
     out_video = out_video.set_audio(out_audio)
