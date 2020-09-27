@@ -196,7 +196,7 @@ if __name__ == "__main__":
         in_f = int(round(map_func(out_t) * in_video.fps))
         next_out_t = out_t + 1 / in_video.fps
         if next_out_t * in_audio.fps > max_out_s:
-            in_f_end = int(in_video.duration * in_video.fps) + 1
+            in_f_end = int(max_in_s / samp_per_frame) + 1
         else:
             in_f_end = int(round(map_func(next_out_t) * in_video.fps))
         if in_f > in_f_end:
